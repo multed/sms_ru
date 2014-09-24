@@ -5,7 +5,6 @@ require 'json'
 require 'docopt'
 
 class SMS
-
 	def initialize
 		@statuses = {
 			'-1' => 'Сообщение не найдено.',
@@ -28,10 +27,10 @@ class SMS
 		}
 	end
 
-	def Send(data) #(apikey, to, from, text, test = '0')
+	def Send(data)
         uri = URI('http://sms.ru/sms/send')
         params = { :api_id => data["--api-id"] }
-        params[:partner_id] = 40129
+        params[:partner_id] = 40129 unless data["--no-partner"]
         params[:to] = data["--to"]
         params[:from] = data["--from"] if data["--from"]
         params[:text] = data["--message"]
@@ -44,7 +43,7 @@ class SMS
         case response
         when Net::HTTPSuccess then
             r = response.body.split("\n")
-            puts "Статус ответа: " + Statuses([r[0]])
+            puts "Статус ответа: " + Statuses(r[0])
             puts "Идентификатор сообщения для проверки статуса: " + r[1]
             puts r[2]
         else
@@ -53,15 +52,14 @@ class SMS
 	end
 
 	def Ballance(apikey)
-		puts "Проверяем балланс."
+		puts "Проверяем баланс."
 		uri = URI('http://sms.ru/my/balance')
         params = {
             :api_id => apikey,
         }
         uri.query = URI.encode_www_form(params)
         response = Net::HTTP.get_response(uri)
-        print "Балланс: ", response.body.split("\n")[1], "\n" if response.is_a?(Net::HTTPSuccess)
-        puts uri.query
+        print "Баланс: ", response.body.split("\n")[1], "\n" if response.is_a?(Net::HTTPSuccess)
 	end
 
 	def Status(apikey,smsid)
@@ -79,19 +77,23 @@ class SMS
 	private
 
 	def Statuses(s)
-		@statuses["#{s}"]
+		if s.empty?
+			'None'
+		else
+			@statuses["#{s}"]
+		end
 	end
 end
 
 doc =<<EOF
 Usage:
- #{__FILE__} send --api-id=<ID> --to=<НОМЕР> --message=<TEXT>
- #{__FILE__} ballance --api-id=<ID>
+ #{__FILE__} send --api-id=<ID> --to=<НОМЕР> --message=<TEXT> [--no-partner]
+ #{__FILE__} balance --api-id=<ID>
  #{__FILE__} status --api-id=<ID> --sms-id=<SMSID>
 
 Commands:
   send                Отправить смс
-  ballance            Проверить балланс
+  balance            Проверить баланс
   status              Проверить статус отправленной смс
 Option:
   -h --help           Показать это сообщение
@@ -100,6 +102,7 @@ Option:
   --to=<NUMBER>       Номер, на который шлем sms.
   --from=<NAME>       Отправитель смс. Должен быть согласован с администрацией сервиса.
   --sms-id=<SMSID>    Идентификатор смс
+  --no-partner        Не учитывать мой код партнера. С кодом разработчик получает комиссию от посланных вами смс.
 EOF
 
 begin
@@ -117,7 +120,7 @@ if arguments["send"]
 	else 
 		puts "Не хватает обязательных параметров."
 	end
-elsif arguments["ballance"]
+elsif arguments["balance"]
 	if arguments["--api-id"]
 		a.Ballance arguments["--api-id"]
 	else 
